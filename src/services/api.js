@@ -1,6 +1,6 @@
 // API Service - Actualizado con historial persistente
 
-const API_BASE_URL = 'https://plantcaredebugger.com/api';
+const API_BASE_URL = 'https://api.plantcaredebugger.com/api';
 
 export const analyzePlant = async (imageBase64, mimeType) => {
   try {
