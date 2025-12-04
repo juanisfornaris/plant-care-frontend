@@ -1,4 +1,4 @@
-// API Service - Actualizado con historial persistente
+Error(// API Service - Actualizado con historial persistente
 
 const API_BASE_URL = 'https://api.plantcaredebugger.com/api';
 
@@ -27,9 +27,6 @@ export const analyzePlant = async (imageBase64, mimeType) => {
   }
 };
 
-// ========================================
-// NUEVO: Guardar diagnóstico en historial (BD)
-// ========================================
 export const guardarEnHistorial = async (diagnostico) => {
   try {
     const response = await fetch(`${API_BASE_URL}/historial`, {
@@ -60,9 +57,6 @@ export const guardarEnHistorial = async (diagnostico) => {
   }
 };
 
-// ========================================
-// NUEVO: Obtener historial desde BD
-// ========================================
 export const obtenerHistorial = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/historial`, {
@@ -84,9 +78,6 @@ export const obtenerHistorial = async () => {
   }
 };
 
-// ========================================
-// NUEVO: Eliminar diagnóstico del historial
-// ========================================
 export const eliminarDelHistorial = async (id) => {
   try {
     const response = await fetch(`${API_BASE_URL}/historial/${id}`, {
