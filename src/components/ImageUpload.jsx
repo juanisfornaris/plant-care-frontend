@@ -1,41 +1,57 @@
 import { useState } from 'react';
-import { analyzePlant, guardarEnHistorial } from '../services/api';
+import { analizarPlanta, guardarEnHistorial } from '../services/api';
 
 function ImageUpload({ onAnalysisComplete }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validar tamaño (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setError('La imagen no debe superar 10MB');
-        return;
-      }
-
-      // Validar tipo
-      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        setError('Solo se permiten imágenes PNG, JPG, JPEG o WEBP');
-        return;
-      }
-
+  const handleImageSelect = (file) => {
+    console.log('📸 Imagen seleccionada:', file);
+    if (file && file.type.startsWith('image/')) {
       setSelectedImage(file);
-      setError(null);
-
-      // Crear preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result);
+        console.log('✅ Preview generado');
       };
       reader.readAsDataURL(file);
+      setError(null);
+    } else {
+      setError('Por favor selecciona un archivo de imagen válido');
+    }
+  };
+
+  const handleFileInput = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleImageSelect(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleImageSelect(file);
     }
   };
 
   const handleAnalyze = async () => {
+    console.log('🔍 Iniciando análisis...');
     if (!selectedImage) {
       setError('Por favor selecciona una imagen primero');
       return;
@@ -45,154 +61,152 @@ function ImageUpload({ onAnalysisComplete }) {
     setError(null);
 
     try {
-      // Convertir imagen a base64
-      const reader = new FileReader();
-      reader.readAsDataURL(selectedImage);
-
-      reader.onload = async () => {
-        try {
-          const base64String = reader.result.split(',')[1];
-          const mimeType = selectedImage.type;
-
-          // Analizar con Gemini
-          const result = await analyzePlant(base64String, mimeType);
-
-          if (result.success && result.analisis) {
-            // NUEVO: Guardar automáticamente en BD
-            try {
-              const historialData = {
-                imagenUrl: preview, // Guardar el preview en base64
-                identificacion: result.analisis.identificacion,
-                estadoSalud: result.analisis.estadoSalud,
-                diagnostico: result.analisis.diagnostico,
-                tratamiento: result.analisis.tratamiento,
-                prevencion: result.analisis.prevencion,
-                nivelUrgencia: result.analisis.nivelUrgencia
-              };
-
-              await guardarEnHistorial(historialData);
-              console.log('✅ Diagnóstico guardado en BD');
-            } catch (historialError) {
-              console.error('⚠️ Error al guardar en historial:', historialError);
-              // No mostramos error al usuario, el análisis sigue siendo válido
-            }
-
-            // Pasar resultado al componente padre
-            onAnalysisComplete(result.analisis);
-
-            // Limpiar formulario
-            setSelectedImage(null);
-            setPreview(null);
-          } else {
-            setError(result.error || 'Error al analizar la imagen');
-          }
-        } catch (analysisError) {
-          setError('Error al analizar la imagen. Por favor intenta de nuevo.');
-          console.error('Analysis error:', analysisError);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      reader.onerror = () => {
-        setError('Error al leer la imagen');
-        setLoading(false);
-      };
+      console.log('📤 Enviando imagen a la API...');
+      const result = await analizarPlanta(selectedImage);
+      console.log('📥 Respuesta recibida:', result);
+      
+      if (result.success) {
+        console.log('✅ Análisis exitoso');
+        
+        // Agregar la imagen URL y nombrePlanta al diagnóstico
+        const diagnosticoCompleto = {
+          ...result.analisis,
+          imagenUrl: preview, // Agregamos la imagen en base64
+          nombrePlanta: result.analisis.identificacion, // Agregamos nombrePlanta
+          nombreCientifico: result.analisis.identificacion.match(/\(([^)]+)\)/)?.[1] || null
+        };
+        
+        console.log('💾 Guardando en historial...');
+        // Guardar en el historial
+        const saveResult = await guardarEnHistorial(diagnosticoCompleto);
+        console.log('✅ Guardado en historial:', saveResult);
+        
+        // Pasar al componente padre
+        onAnalysisComplete(diagnosticoCompleto);
+      } else {
+        console.error('❌ Error en respuesta:', result.error);
+        setError(result.error || 'Error al analizar la imagen');
+      }
     } catch (err) {
-      setError('Error al procesar la imagen');
+      console.error('❌ Error en handleAnalyze:', err);
+      setError('Error de conexión. Por favor intenta de nuevo.');
+    } finally {
       setLoading(false);
     }
   };
 
+  const handleReset = () => {
+    setSelectedImage(null);
+    setPreview(null);
+    setError(null);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold text-green-700 mb-4">
-        📸 Subir Imagen de tu Planta
-      </h2>
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">
+          🌿 Analiza tu Planta
+        </h2>
+        <p className="text-gray-600 text-center mb-6">
+          Sube una foto y obtén un diagnóstico completo con IA
+        </p>
 
-      <div className="space-y-4">
-        {/* Input de archivo */}
-        <div>
-          <label
-            htmlFor="image-upload"
-            className="block text-sm font-medium text-gray-700 mb-2"
+        {!preview ? (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`border-4 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ${
+              isDragging
+                ? 'border-emerald-500 bg-emerald-50 scale-105'
+                : 'border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50'
+            }`}
           >
-            Selecciona una imagen (PNG, JPG, WEBP - máx 10MB)
-          </label>
-          <input
-            id="image-upload"
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            onChange={handleImageChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer"
-            disabled={loading}
-          />
-        </div>
-
-        {/* Preview de la imagen */}
-        {preview && (
-          <div className="mt-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">Vista previa:</p>
-            <img
-              src={preview}
-              alt="Preview"
-              className="max-w-full h-auto rounded-lg border-2 border-gray-200"
-              style={{ maxHeight: '400px' }}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileInput}
+              className="hidden"
+              id="image-upload"
             />
+            <label
+              htmlFor="image-upload"
+              className="cursor-pointer block"
+            >
+              <div className="flex flex-col items-center space-y-4">
+                <span className="text-7xl">📸</span>
+                <div>
+                  <p className="text-xl font-bold text-gray-800 mb-2">
+                    Arrastra tu imagen aquí
+                  </p>
+                  <p className="text-lg text-emerald-600 font-semibold mb-1">
+                    o haz click para seleccionar
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    PNG, JPG o JPEG (máx. 10MB)
+                  </p>
+                </div>
+              </div>
+            </label>
           </div>
-        )}
+        ) : (
+          <div className="space-y-6">
+            <div className="relative rounded-xl overflow-hidden shadow-xl border-4 border-emerald-200">
+              <img
+                src={preview}
+                alt="Preview"
+                className="w-full h-96 object-cover"
+              />
+            </div>
 
-        {/* Errores */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
-
-        {/* Botón de análisis */}
-        <button
-          onClick={handleAnalyze}
-          disabled={!selectedImage || loading}
-          className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-colors ${
-            !selectedImage || loading
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-green-600 hover:bg-green-700'
-          }`}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center">
-              <svg
-                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+            <div className="space-y-3">
+              <button
+                onClick={handleAnalyze}
+                disabled={loading}
+                className={`w-full px-8 py-5 rounded-xl font-bold text-xl transition-all duration-300 ${
+                  loading
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg hover:shadow-2xl hover:scale-105 hover:from-emerald-600 hover:to-teal-600'
+                }`}
               >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Analizando con IA...
-            </span>
-          ) : (
-            '🔍 Analizar Planta'
-          )}
-        </button>
-
-        {loading && (
-          <p className="text-sm text-gray-600 text-center">
-            Esto puede tomar entre 5-15 segundos...
-          </p>
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Analizando con IA...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center">
+                    <span className="text-2xl mr-2">🔍</span>
+                    Analizar Planta
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={handleReset}
+                disabled={loading}
+                className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium border-2 border-gray-300 hover:bg-gray-200 hover:scale-102 transition-all disabled:opacity-50"
+              >
+                ❌ Cambiar Imagen
+              </button>
+            </div>
+          </div>
         )}
+
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border-l-4 border-red-500 rounded">
+            <p className="text-red-700 font-medium">⚠️ {error}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg shadow-sm">
+        <p className="text-sm text-blue-700">
+          <strong>💡 Tip:</strong> Para mejores resultados, toma fotos claras de las hojas, flores o partes afectadas de tu planta con buena iluminación.
+        </p>
       </div>
     </div>
   );

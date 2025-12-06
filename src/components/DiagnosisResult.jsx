@@ -1,186 +1,148 @@
 import { useState } from 'react';
 
-function DiagnosisResult({ diagnosis, onSave, onNewAnalysis }) {
-  const [isSaved, setIsSaved] = useState(false);
+function DiagnosisResult({ diagnosis, onNewAnalysis }) {
+  const [showFullDiagnosis, setShowFullDiagnosis] = useState(false);
+  const [showFullTreatment, setShowFullTreatment] = useState(false);
 
-  // Determinar el nivel de urgencia y sus colores
-  const getUrgencyInfo = (urgencia) => {
-    const urgenciaLower = urgencia?.toLowerCase() || 'bajo';
-    
-    if (urgenciaLower.includes('alto') || urgenciaLower.includes('urgente')) {
-      return {
-        level: 'ALTO',
-        color: 'bg-red-100 border-red-400 text-red-800',
-        icon: '🚨',
-        message: 'Atención inmediata requerida'
-      };
-    } else if (urgenciaLower.includes('medio') || urgenciaLower.includes('moderado')) {
-      return {
-        level: 'MEDIO',
-        color: 'bg-yellow-100 border-yellow-400 text-yellow-800',
-        icon: '⚠️',
-        message: 'Requiere atención pronto'
-      };
-    } else {
-      return {
-        level: 'BAJO',
-        color: 'bg-green-100 border-green-400 text-green-800',
-        icon: '✅',
-        message: 'Monitoreo regular suficiente'
-      };
+  const getUrgenciaColor = (nivel) => {
+    switch (nivel?.toLowerCase()) {
+      case 'alto':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'medio':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'bajo':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
-  const urgencyInfo = getUrgencyInfo(diagnosis.nivelUrgencia);
-
-  const handleSave = () => {
-    onSave(diagnosis);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+  const getUrgenciaIcon = (nivel) => {
+    switch (nivel?.toLowerCase()) {
+      case 'alto':
+        return '🚨';
+      case 'medio':
+        return '⚠️';
+      case 'bajo':
+        return '✅';
+      default:
+        return 'ℹ️';
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {/* Header con imagen */}
-        <div className="relative h-64 bg-gradient-to-br from-emerald-400 to-emerald-600">
-          {diagnosis.imagePreview && (
+        <div className="relative h-64 bg-gradient-to-br from-emerald-400 to-teal-500">
+          {diagnosis.imagenUrl && (
             <img
-              src={diagnosis.imagePreview}
-              alt="Planta analizada"
-              className="w-full h-full object-cover opacity-40"
+              src={diagnosis.imagenUrl}
+              alt={diagnosis.nombrePlanta}
+              className="w-full h-full object-cover opacity-90"
             />
           )}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-white">
-              <h2 className="text-4xl font-bold mb-2">Análisis Completo</h2>
-              <p className="text-emerald-100">Diagnóstico generado por IA</p>
-            </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+            <h1 className="text-3xl font-bold mb-2">🌿 {diagnosis.nombrePlanta}</h1>
+            {diagnosis.nombreCientifico && (
+              <p className="text-lg italic opacity-90">{diagnosis.nombreCientifico}</p>
+            )}
           </div>
         </div>
 
+        {/* Contenido */}
         <div className="p-8 space-y-6">
+          {/* Estado de Salud */}
+          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border-l-4 border-blue-500">
+            <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+              <span className="text-2xl mr-2">🩺</span>
+              Estado de Salud
+            </h2>
+            <p className="text-gray-700 text-lg">{diagnosis.estadoSalud}</p>
+          </div>
+
           {/* Nivel de Urgencia */}
-          <div className={`border-2 rounded-xl p-6 ${urgencyInfo.color}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <span className="text-3xl">{urgencyInfo.icon}</span>
-                <div>
-                  <p className="text-sm font-medium opacity-80">Nivel de Urgencia</p>
-                  <p className="text-2xl font-bold">{urgencyInfo.level}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">{urgencyInfo.message}</p>
-              </div>
+          <div className={`rounded-xl p-6 border-2 ${getUrgenciaColor(diagnosis.nivelUrgencia)}`}>
+            <h2 className="text-xl font-bold mb-3 flex items-center">
+              <span className="text-2xl mr-2">{getUrgenciaIcon(diagnosis.nivelUrgencia)}</span>
+              Nivel de Urgencia
+            </h2>
+            <p className="text-2xl font-bold">{diagnosis.nivelUrgencia?.toUpperCase()}</p>
+          </div>
+
+          {/* Diagnóstico */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border-l-4 border-purple-500">
+            <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+              <span className="text-2xl mr-2">🔍</span>
+              Diagnóstico
+            </h2>
+            <div className="text-gray-700 leading-relaxed">
+              {showFullDiagnosis ? (
+                <p className="whitespace-pre-line">{diagnosis.diagnostico}</p>
+              ) : (
+                <p className="whitespace-pre-line">
+                  {diagnosis.diagnostico?.substring(0, 300)}
+                  {diagnosis.diagnostico?.length > 300 && '...'}
+                </p>
+              )}
+              {diagnosis.diagnostico?.length > 300 && (
+                <button
+                  onClick={() => setShowFullDiagnosis(!showFullDiagnosis)}
+                  className="mt-2 text-purple-600 font-medium hover:underline"
+                >
+                  {showFullDiagnosis ? '← Ver menos' : 'Ver más →'}
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Identificación */}
-          {diagnosis.identificacion && (
-            <div className="bg-emerald-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-emerald-800 mb-3 flex items-center space-x-2">
-                <span>🌿</span>
-                <span>Identificación de la Planta</span>
-              </h3>
-              <p className="text-gray-700 leading-relaxed">{diagnosis.identificacion}</p>
-            </div>
-          )}
-
-          {/* Estado de Salud */}
-          {diagnosis.estadoSalud && (
-            <div className="bg-blue-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-blue-800 mb-3 flex items-center space-x-2">
-                <span>🩺</span>
-                <span>Estado de Salud</span>
-              </h3>
-              <p className="text-gray-700 leading-relaxed">{diagnosis.estadoSalud}</p>
-            </div>
-          )}
-
-          {/* Diagnóstico */}
-          {diagnosis.diagnostico && (
-            <div className="bg-purple-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-purple-800 mb-3 flex items-center space-x-2">
-                <span>🔬</span>
-                <span>Diagnóstico</span>
-              </h3>
-              <p className="text-gray-700 leading-relaxed">{diagnosis.diagnostico}</p>
-            </div>
-          )}
-
           {/* Tratamiento */}
-          {diagnosis.tratamiento && (
-            <div className="bg-orange-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-orange-800 mb-3 flex items-center space-x-2">
-                <span>💊</span>
-                <span>Tratamiento Recomendado</span>
-              </h3>
-              <div className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {diagnosis.tratamiento}
-              </div>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-l-4 border-green-500">
+            <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+              <span className="text-2xl mr-2">💊</span>
+              Tratamiento Recomendado
+            </h2>
+            <div className="text-gray-700 leading-relaxed">
+              {showFullTreatment ? (
+                <p className="whitespace-pre-line">{diagnosis.tratamiento}</p>
+              ) : (
+                <p className="whitespace-pre-line">
+                  {diagnosis.tratamiento?.substring(0, 300)}
+                  {diagnosis.tratamiento?.length > 300 && '...'}
+                </p>
+              )}
+              {diagnosis.tratamiento?.length > 300 && (
+                <button
+                  onClick={() => setShowFullTreatment(!showFullTreatment)}
+                  className="mt-2 text-green-600 font-medium hover:underline"
+                >
+                  {showFullTreatment ? '← Ver menos' : 'Ver más →'}
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Prevención */}
           {diagnosis.prevencion && (
-            <div className="bg-teal-50 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-teal-800 mb-3 flex items-center space-x-2">
-                <span>🛡️</span>
-                <span>Prevención</span>
-              </h3>
-              <div className="text-gray-700 leading-relaxed whitespace-pre-line">
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border-l-4 border-amber-500">
+              <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                <span className="text-2xl mr-2">🛡️</span>
+                Prevención
+              </h2>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
                 {diagnosis.prevencion}
-              </div>
+              </p>
             </div>
           )}
 
-          {/* Información de análisis */}
-          <div className="border-t pt-6">
-            <p className="text-sm text-gray-500 text-center">
-              Análisis realizado el{' '}
-              {new Date(diagnosis.analyzedAt).toLocaleString('es-ES', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </p>
-          </div>
-
-          {/* Botones de acción */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-            <button
-              onClick={handleSave}
-              disabled={isSaved}
-              className={`py-4 rounded-xl font-semibold text-lg transition-all ${
-                isSaved
-                  ? 'bg-green-500 text-white'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-lg'
-              }`}
-            >
-              {isSaved ? (
-                <span className="flex items-center justify-center space-x-2">
-                  <span>✓</span>
-                  <span>Guardado en Historial</span>
-                </span>
-              ) : (
-                <span className="flex items-center justify-center space-x-2">
-                  <span>💾</span>
-                  <span>Guardar en Historial</span>
-                </span>
-              )}
-            </button>
-
+          {/* Botón para nuevo análisis */}
+          <div className="pt-4">
             <button
               onClick={onNewAnalysis}
-              className="py-4 rounded-xl font-semibold text-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all hover:shadow-lg"
+              className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
-              <span className="flex items-center justify-center space-x-2">
-                <span>🔄</span>
-                <span>Analizar Otra Planta</span>
-              </span>
+              🌱 Analizar Otra Planta
             </button>
           </div>
         </div>

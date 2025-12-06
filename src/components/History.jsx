@@ -1,77 +1,42 @@
 import { useState, useEffect } from 'react';
-import { obtenerHistorial, eliminarDelHistorial } from '../services/api';
+import { obtenerHistorial, eliminarDiagnostico } from '../services/api';
 
 function History({ onSelectDiagnosis, onHistoryChange }) {
   const [historial, setHistorial] = useState([]);
   const [filtroUrgencia, setFiltroUrgencia] = useState('Todos');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Cargar historial desde BD al montar componente
   useEffect(() => {
     cargarHistorial();
   }, []);
 
   const cargarHistorial = async () => {
     setLoading(true);
-    setError(null);
-    
     try {
       const response = await obtenerHistorial();
-      
       if (response.success) {
         setHistorial(response.historial || []);
         console.log(`✅ ${response.count} diagnósticos cargados desde BD`);
-      } else {
-        setError('Error al cargar el historial');
+        if (onHistoryChange) {
+          onHistoryChange();
+        }
       }
     } catch (err) {
       console.error('Error loading history:', err);
-      setError('No se pudo conectar con el servidor');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEliminar = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este diagnóstico?')) {
-      return;
-    }
-
-    try {
-      const response = await eliminarDelHistorial(id);
-      
-      if (response.success) {
-        // Eliminar del estado local
-        setHistorial(historial.filter(item => item.id !== id));
-        console.log('✅ Diagnóstico eliminado de BD');
-        
-        // Notificar al padre para actualizar contador
-        if (onHistoryChange) {
-          onHistoryChange();
-        }
-      } else {
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Estás seguro de eliminar este diagnóstico?')) {
+      try {
+        await eliminarDiagnostico(id);
+        cargarHistorial();
+      } catch (err) {
+        console.error('Error deleting:', err);
         alert('Error al eliminar el diagnóstico');
       }
-    } catch (err) {
-      console.error('Error deleting:', err);
-      alert('No se pudo eliminar el diagnóstico');
-    }
-  };
-
-  const handleClickDiagnosis = (item) => {
-    // Convertir el formato de BD al formato que espera DiagnosisResult
-    const diagnosis = {
-      identificacion: item.identificacion,
-      estadoSalud: item.estadoSalud,
-      diagnostico: item.diagnostico,
-      tratamiento: item.tratamiento,
-      prevencion: item.prevencion,
-      nivelUrgencia: item.nivelUrgencia
-    };
-    
-    if (onSelectDiagnosis) {
-      onSelectDiagnosis(diagnosis);
     }
   };
 
@@ -79,174 +44,154 @@ function History({ onSelectDiagnosis, onHistoryChange }) {
     ? historial
     : historial.filter(item => item.nivelUrgencia === filtroUrgencia);
 
-  const getUrgenciaColor = (urgencia) => {
-    switch (urgencia) {
-      case 'Alto':
-        return 'bg-red-100 border-red-300 text-red-800';
-      case 'Medio':
-        return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-      case 'Bajo':
-        return 'bg-green-100 border-green-300 text-green-800';
+  const getUrgenciaColor = (nivel) => {
+    switch (nivel?.toLowerCase()) {
+      case 'alto':
+        return { bg: 'bg-red-100', text: 'text-red-800', badge: 'bg-red-500', icon: '🚨' };
+      case 'medio':
+        return { bg: 'bg-yellow-50', text: 'text-yellow-800', badge: 'bg-yellow-500', icon: '⚠️' };
+      case 'bajo':
+        return { bg: 'bg-green-50', text: 'text-green-800', badge: 'bg-green-500', icon: '✓' };
       default:
-        return 'bg-gray-100 border-gray-300 text-gray-800';
-    }
-  };
-
-  const getUrgenciaIcon = (urgencia) => {
-    switch (urgencia) {
-      case 'Alto':
-        return '🚨';
-      case 'Medio':
-        return '⚠️';
-      case 'Bajo':
-        return '✅';
-      default:
-        return '📋';
+        return { bg: 'bg-gray-50', text: 'text-gray-800', badge: 'bg-gray-500', icon: 'ℹ️' };
     }
   };
 
   const formatearFecha = (fecha) => {
     const date = new Date(fecha);
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString('es-ES', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
     });
+  };
+
+  const truncarTexto = (texto, maxLength = 100) => {
+    if (!texto) return '';
+    if (texto.length <= maxLength) return texto;
+    return texto.substring(0, maxLength) + '...';
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-green-700 mb-4">
-          📚 Historial de Diagnósticos
-        </h2>
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-          <p className="mt-4 text-gray-600">Cargando historial...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-green-700 mb-4">
-          📚 Historial de Diagnósticos
-        </h2>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          ⚠️ {error}
-          <button
-            onClick={cargarHistorial}
-            className="ml-4 text-sm underline hover:no-underline"
-          >
-            Reintentar
-          </button>
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-green-700">
-          📚 Historial de Diagnósticos
-        </h2>
-        <button
-          onClick={cargarHistorial}
-          className="text-sm text-green-600 hover:text-green-700 underline"
-        >
-          🔄 Actualizar
-        </button>
-      </div>
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">📊 Historial de Diagnósticos</h2>
+          <button
+            onClick={cargarHistorial}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-medium hover:shadow-lg transition-all"
+          >
+            🔄 Actualizar
+          </button>
+        </div>
 
-      {/* Filtros */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Filtrar por urgencia:
-        </label>
-        <div className="flex gap-2 flex-wrap">
-          {['Todos', 'Bajo', 'Medio', 'Alto'].map((filtro) => (
+        <div className="flex space-x-2 mb-4">
+          {['Todos', 'Alto', 'Medio', 'Bajo'].map((filtro) => (
             <button
               key={filtro}
               onClick={() => setFiltroUrgencia(filtro)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 filtroUrgencia === filtro
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {filtro === 'Todos' && '📋'}
-              {filtro === 'Bajo' && '✅'}
-              {filtro === 'Medio' && '⚠️'}
-              {filtro === 'Alto' && '🚨'}
-              {' '}{filtro}
+              {filtro}
             </button>
           ))}
         </div>
+
+        <p className="text-sm text-gray-600">
+          Mostrando {historialFiltrado.length} de {historial.length} diagnósticos
+        </p>
       </div>
 
-      {/* Lista de diagnósticos */}
       {historialFiltrado.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <p className="text-lg mb-2">📭 No hay diagnósticos</p>
-          <p className="text-sm">
-            {filtroUrgencia === 'Todos'
-              ? 'Analiza tu primera planta para comenzar'
-              : `No hay diagnósticos con urgencia ${filtroUrgencia}`}
-          </p>
+        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+          <span className="text-6xl mb-4 block">🌱</span>
+          <p className="text-xl text-gray-600">No hay diagnósticos en el historial</p>
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 mb-4">
-            Total: {historialFiltrado.length} diagnóstico(s)
-          </p>
-          
-          {historialFiltrado.map((item) => (
-            <div
-              key={item.id}
-              className={`border-2 rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${getUrgenciaColor(
-                item.nivelUrgencia
-              )}`}
-              onClick={() => handleClickDiagnosis(item)}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">{getUrgenciaIcon(item.nivelUrgencia)}</span>
-                    <h3 className="font-bold text-lg">
-                      {item.identificacion || 'Planta sin identificar'}
-                    </h3>
+          {historialFiltrado.map((item) => {
+            const colors = getUrgenciaColor(item.nivelUrgencia);
+            return (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl p-5 shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-emerald-200"
+              >
+                <div className="flex items-start space-x-4">
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={item.imagenUrl}
+                      alt={item.nombrePlanta}
+                      className="w-20 h-20 object-cover rounded-xl shadow-md"
+                    />
+                    <div className={`absolute -bottom-2 -right-2 ${colors.badge} text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg`}>
+                      {colors.icon}
+                    </div>
                   </div>
-                  
-                  <p className="text-sm mb-2">
-                    {item.diagnostico?.substring(0, 100)}...
-                  </p>
-                  
-                  <div className="flex items-center gap-4 text-xs text-gray-600">
-                    <span>📅 {formatearFecha(item.fecha)}</span>
-                    <span className="px-2 py-1 bg-white bg-opacity-70 rounded">
-                      {item.nivelUrgencia}
-                    </span>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-800 text-lg">
+                          {item.nombrePlanta}
+                        </h3>
+                        {item.nombreCientifico && (
+                          <p className="text-sm text-gray-600 italic mt-0.5">
+                            {item.nombreCientifico}
+                          </p>
+                        )}
+                      </div>
+                      <span className={`px-3 py-1 ${colors.bg} ${colors.text} text-xs font-bold rounded-full ml-2 flex-shrink-0`}>
+                        {item.nivelUrgencia?.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className={`${colors.bg} rounded-lg p-3 mb-3`}>
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        🩺 <strong>Estado:</strong> {item.estadoSalud}<br />
+                        💡 <strong>Diagnóstico:</strong> {truncarTexto(item.diagnostico, 120)}<br />
+                        🎯 <strong>Tratamiento:</strong> {truncarTexto(item.tratamiento, 100)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">
+                        📅 {formatearFecha(item.fecha)}
+                      </span>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => onSelectDiagnosis(item)}
+                          className="text-emerald-600 font-medium hover:underline"
+                        >
+                          Ver completo →
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item.id);
+                          }}
+                          className="text-red-600 font-medium hover:underline"
+                        >
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEliminar(item.id);
-                  }}
-                  className="ml-4 text-red-600 hover:text-red-800 text-xl"
-                  title="Eliminar"
-                >
-                  🗑️
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
