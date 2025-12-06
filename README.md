@@ -2,3 +2,5 @@
 
 Aplicación web para diagnóstico de plantas con IA
 
+
+## Deploy automático configurado
